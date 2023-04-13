@@ -22,7 +22,7 @@ def get_saving_frames_durations(cap, saving_fps):
     return s
 
 def Cloathing_detection_video_to_img(video_file):
-    SAVING_FRAMES_PER_SECOND = 0.01
+    SAVING_FRAMES_PER_SECOND = 0.1
     filename = "video_to_img"
     if not os.path.isdir(filename):
         os.mkdir(filename)
@@ -53,7 +53,7 @@ def Cloathing_detection_video_to_img(video_file):
             # если ближайшая длительность меньше или равна длительности кадра,
             # затем сохраняем фрейм
             
-            cv2.imwrite(os.path.join(filename, "tmp.jpg"), frame) 
+            cv2.imwrite(os.path.join(filename, "tmp" + str(count) + ".jpg"), frame) 
             # удалить точку продолжительности из списка, так как эта точка длительности уже сохранена
             try:
                 saving_frames_durations.pop(0)
@@ -119,89 +119,93 @@ def run(
     detectron = YOLOv3Predictor(params=yolo_params)
     print("Модель Clothing detection загрузилась")
     print()
-
+      
     for source_img in os.listdir(source):
-        source_img = str(source) + "/" + str(source_img)
-        print(source_img)
+        if (str(source_img) != ".ipynb_checkpoints"):
+            source_img = str(source) + "/" + str(source_img)
+            print(source_img)
 
 
-        path = source_img
-        if not os.path.exists(path):
-            print('Img does not exists..')
-            print(path)
-        
-        Cloathing_detection_video_to_img(path)
-
-        img = cv2.imread("video_to_img/tmp.jpg")
-
-        detections = detectron.get_detections(img)
-
-        # Dataloader
-        dataset = LoadImages(source_img, img_size=imgsz, stride=stride, auto=pt, vid_stride=vid_stride)
-
-        
-
-        # Run inference
-
-
-        model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup
-        seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
-        ans = []
-        for path, im, im0s, vid_cap, s in dataset:
-            with dt[0]:
-                im = torch.from_numpy(im).to(model.device)
-                im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
-                im /= 255  # 0 - 255 to 0.0 - 1.0
-                if len(im.shape) == 3:
-                    im = im[None]  # expand for batch dim
-
-            # Inference
-            with dt[1]:
-                visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
-                pred = model(im, augment=augment, visualize=visualize)
-
-            # NMS
-            with dt[2]:
-              
-                pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
-
-            # Second-stage classifier (optional)
-            # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
+            path = source_img
+            if not os.path.exists(path):
+                print('Img does not exists..')
+                print(path)
             
-            # Process predictions
-            for i, det in enumerate(pred):  # per image
-                seen += 1
-                p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
+            Cloathing_detection_video_to_img(path)
 
-                if len(det):
-                    # Rescale boxes from img_size to im0 size
-                    det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
-                    # Print results
-                    for c in det[:, 5].unique():
-                        n = (det[:, 5] == c).sum()  # detections per class
-                        detection_item = f"{n} {names[int(c)]}{'s' * (n > 1)}"[2:]
-                        if not ((detection_item[:-1] in ans) or (detection_item + "s" in ans) or (detection_item in ans)):
-                            ans.append(detection_item)
+            img = cv2.imread("video_to_img/tmp300.jpg")
 
-        # Print results
+            detections = detectron.get_detections(img)
 
-        answer = ""
-        for _ in ans:
-          answer += _ + ", "
-        ans_file = open("../answer.txt", "w")
-        ans_file.write(answer[:-2] + "\n")
-        ans_file.close()
-        print(answer[:-2])
+            # Dataloader
+            dataset = LoadImages(source_img, img_size=imgsz, stride=stride, auto=pt, vid_stride=vid_stride)
 
-        if len(detections) != 0 :
-            detections.sort(reverse=False ,key = lambda x:x[4])
-            for x1, y1, x2, y2, cls_conf, cls_pred in detections:
+            
 
-                    print("%s" % (cloathing_classes[int(cls_pred)]))
-                    ans_file = open("../answer.txt", "a")
-                    ans_file.write("%s" % (cloathing_classes[int(cls_pred)]) + "\n")
-                    ans_file.close()
-        print()
+            # Run inference
+
+
+            model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup
+            seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
+            ans = []
+            for path, im, im0s, vid_cap, s in dataset:
+                with dt[0]:
+                    im = torch.from_numpy(im).to(model.device)
+                    im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
+                    im /= 255  # 0 - 255 to 0.0 - 1.0
+                    if len(im.shape) == 3:
+                        im = im[None]  # expand for batch dim
+
+                # Inference
+                with dt[1]:
+                    visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
+                    pred = model(im, augment=augment, visualize=visualize)
+
+                # NMS
+                with dt[2]:
+                  
+                    pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+
+                # Second-stage classifier (optional)
+                # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
+                
+                # Process predictions
+                for i, det in enumerate(pred):  # per image
+                    seen += 1
+                    p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
+
+                    if len(det):
+                        # Rescale boxes from img_size to im0 size
+                        det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
+                        # Print results
+                        for c in det[:, 5].unique():
+                            n = (det[:, 5] == c).sum()  # detections per class
+                            detection_item = f"{n} {names[int(c)]}{'s' * (n > 1)}"[2:]
+                            if not ((detection_item[:-1] in ans) or (detection_item + "s" in ans) or (detection_item in ans)):
+                                ans.append(detection_item)
+
+            # Print results
+
+            answer = ""
+            for _ in ans:
+              answer += _ + ", "
+            ans_file = open("../answer.txt", "w")
+            ans_file.write(answer[:-2] + "\n")
+            ans_file.close()
+            print(answer[:-2])
+
+            if len(detections) != 0 :
+                detections.sort(reverse=False ,key = lambda x:x[4])
+                for x1, y1, x2, y2, cls_conf, cls_pred in detections:
+
+                        print("%s" % (cloathing_classes[int(cls_pred)]))
+                        x = (x1 + x2)/2
+                        y = (y1 + y2)/2
+                        print(x, y)
+                        ans_file = open("../answer.txt", "a")
+                        ans_file.write("%s" % (cloathing_classes[int(cls_pred)]) + "\n")
+                        ans_file.close()
+            print()
 
 def parse_opt():
     parser = argparse.ArgumentParser()
