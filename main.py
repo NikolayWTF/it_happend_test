@@ -11,6 +11,38 @@ from utils.general import (LOGGER, Profile, check_file, check_img_size, check_im
                            increment_path, non_max_suppression, print_args, scale_boxes, strip_optimizer, xyxy2xywh)
 from utils.torch_utils import select_device, smart_inference_mode
 
+
+
+colors = [['black', 0,0,0], ['white', 255, 255, 255], ['red', 255, 0, 0],
+ ['lime color', 0, 255, 0], ['blue', 0, 0, 255], ['yellow', 255, 255, 0],
+ ['blue aqua', 0, 255, 255], ['pink', 255, 0, 255], ['burgundy', 128, 0, 0], ['green', 0, 128, 0], 
+ ['violet', 128, 0, 128], ['turquoise', 0, 128, 128], ['navy blue', 0, 0, 128],
+ ['navy orange', 255, 140, 0], ['orange', 255, 69, 0], ['olive', 107, 142, 35],
+ ['blue', 70, 130, 180], ['light blue', 173, 216, 30],
+ ['light blue', 135, 206, 250], ['violet', 138, 43, 226], ['violet', 75, 0, 130],
+ ['navy pink', 255, 20, 147], ['beige', 245, 245, 20], ['brown', 139, 69, 19]]
+def get_color(image, X, Y):
+    # B, G, R = (0, 0, 0)
+    # for i in Y:
+    #     for j in X:
+    #         b, g, r = image[j, i]
+    #         R += r
+    #         G += g
+    #         B += b
+    # R = int(R/9)
+    # G = int(G/9)
+    # B = int(B/9)
+    B, G, R = image[X, Y]
+    minimum = 1000
+    color_name = 'black'
+    for i in range(len(colors)):
+        d = abs(colors[i][1] - R) + abs(colors[i][2]- G)+ abs(colors[i][3]- B)
+        if d <= minimum:
+          minimum = d
+          color_name = colors[i][0]
+    
+    return color_name
+
 def get_saving_frames_durations(cap, saving_fps):
     """Функция, которая возвращает список длительностей, в которые следует сохранять кадры."""
     s = []
@@ -22,7 +54,7 @@ def get_saving_frames_durations(cap, saving_fps):
     return s
 
 def Cloathing_detection_video_to_img(video_file):
-    SAVING_FRAMES_PER_SECOND = 0.1
+    SAVING_FRAMES_PER_SECOND = 0.01
     filename = "video_to_img"
     if not os.path.isdir(filename):
         os.mkdir(filename)
@@ -53,7 +85,7 @@ def Cloathing_detection_video_to_img(video_file):
             # если ближайшая длительность меньше или равна длительности кадра,
             # затем сохраняем фрейм
             
-            cv2.imwrite(os.path.join(filename, "tmp" + str(count) + ".jpg"), frame) 
+            cv2.imwrite(os.path.join(filename, "tmp.jpg"), frame) 
             # удалить точку продолжительности из списка, так как эта точка длительности уже сохранена
             try:
                 saving_frames_durations.pop(0)
@@ -69,7 +101,6 @@ ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
-
 
 @smart_inference_mode()
 def run(
@@ -108,7 +139,7 @@ def run(
     "class_path":"yolo/modanetcfg/modanet.names",
     "conf_thres" : 0.5,
     "nms_thres" :0.4,
-    "img_size" : 416,
+    "img_size" : 886,
     "device" : device}
 
     print("Начало загрузки модели Clothing detection")
@@ -133,7 +164,7 @@ def run(
             
             Cloathing_detection_video_to_img(path)
 
-            img = cv2.imread("video_to_img/tmp300.jpg")
+            img = cv2.imread("video_to_img/tmp.jpg")
 
             detections = detectron.get_detections(img)
 
@@ -197,11 +228,12 @@ def run(
             if len(detections) != 0 :
                 detections.sort(reverse=False ,key = lambda x:x[4])
                 for x1, y1, x2, y2, cls_conf, cls_pred in detections:
-
-                        print("%s" % (cloathing_classes[int(cls_pred)]))
-                        x = (x1 + x2)/2
-                        y = (y1 + y2)/2
-                        print(x, y)
+                        # X = [int((3*x1 + x2)/4), int((x1 + x2)/2), int((x1 + 3*x2)/4)]
+                        # Y = [int((3*y1 + y2)/4), int((y1 + y2)/2), int((y1 + 3*y2)/4)]
+                        x, y = (int((x1 + x2)/2), int((y1 + y2)/2))
+                        image = cv2.imread("video_to_img/tmp.jpg")
+                        color_name = get_color(image, x, y)
+                        print(color_name + " " + "%s" % (cloathing_classes[int(cls_pred)]))
                         ans_file = open("../answer.txt", "a")
                         ans_file.write("%s" % (cloathing_classes[int(cls_pred)]) + "\n")
                         ans_file.close()
