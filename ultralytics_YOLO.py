@@ -10,18 +10,16 @@ import cv2
 import numpy as np
 from predictors.YOLOv3 import YOLOv3Predictor
 
-colors = [['black', 0, 0, 0], ['white', 255, 255, 255], ['red', 255, 0, 0],
-          ['lime color', 0, 255, 0], ['blue', 0, 0, 255], ['yellow', 255, 255, 0],
-          ['blue aqua', 0, 255, 255], ['pink', 255, 0, 255], ['burgundy', 128, 0, 0], ['green', 0, 128, 0],
-          ['violet', 128, 0, 128], ['turquoise', 0, 128, 128], ['navy blue', 0, 0, 128],
-          ['navy orange', 255, 140, 0], ['orange', 255, 69, 0], ['olive', 107, 142, 35],
-          ['blue', 70, 130, 180], ['light blue', 173, 216, 30],
-          ['light blue', 135, 206, 250], ['violet', 138, 43, 226], ['violet', 75, 0, 130],
-          ['navy pink', 255, 20, 147], ['beige', 245, 245, 20], ['brown', 139, 69, 19]]
+colors = [['black', 0, 0, 0], ['white', 255, 255, 255], ['red', 255, 0, 0], ['lime color', 0, 255, 0],
+          ['blue', 0, 0, 255], ['yellow', 255, 255, 0], ['blue aqua', 0, 255, 255], ['pink', 255, 0, 255],
+          ['burgundy', 128, 0, 0], ['green', 0, 128, 0], ['violet', 128, 0, 128], ['turquoise', 0, 128, 128],
+          ['navy blue', 0, 0, 128], ['navy orange', 255, 140, 0], ['orange', 255, 69, 0], ['olive', 107, 142, 35],
+          ['blue', 70, 130, 180], ['light blue', 173, 216, 30], ['light blue', 135, 206, 250], ['violet', 138, 43, 226],
+          ['violet', 75, 0, 130], ['navy pink', 255, 20, 147], ['beige', 245, 245, 20], ['brown', 139, 69, 19]]
 
 
 def get_color(image, x, y):
-    b, g, r = image[x, y]
+    b, g, r = image[y, x]
     minimum = 1000
     color_name = 'black'
     for i in range(len(colors)):
@@ -48,7 +46,7 @@ yolo_modanet_params = {"model_def": "yolo/modanetcfg/yolov3-modanet.cfg",
 yolo_params = yolo_modanet_params
 # Classes
 clothing_classes = ['bag', 'belt', 'boots', 'footwear', 'outer', 'dress', 'sunglasses', 'pants', 'top', 'shorts',
-                     'skirt', 'headwear', 'scarf/tie']
+                    'skirt', 'headwear', 'scarf/tie']
 detectron = YOLOv3Predictor(params=yolo_params)
 # Конец загрузки clothing detection
 
@@ -63,8 +61,7 @@ for file_name in videos:
                     conf=0.7, vid_stride=True, device="mps", task='detect', stream=True)
 
     classes = []
-    clothing = []
-    color_clothing = []
+    clothing_dict = {}
     for r in results:
         # print(len(r.boxes.cls))
         boxes = r.boxes
@@ -80,11 +77,10 @@ for file_name in videos:
                     detections.sort(reverse=False, key=lambda x: x[4])
                     for x1, y1, x2, y2, cls_conf, cls_pred in detections:
                         cloth_name = clothing_classes[int(cls_pred)]
-                        if cloth_name not in clothing:
+                        if not (cloth_name in clothing_dict):
                             x, y = (int((x1 + x2) / 2), int((y1 + y2) / 2))
-                            color_name = get_color(img, y, x)
-                            clothing.append(cloth_name)
-                            color_clothing.append(color_name)
+                            color_name = get_color(img, x, y)
+                            clothing_dict[cloth_name] = [cls_conf, color_name]
 
         if len(r.boxes.cls) != 0:
             cls = r.boxes.cls.cpu().detach().numpy()
@@ -94,9 +90,8 @@ for file_name in videos:
     classes = [item for sublist in classes for item in sublist]
     classes = list(set(classes))
     print(classes)
-    ind = 0
+    sorted_keys_in_clothing_dict = sorted(clothing_dict, key=clothing_dict.get, reverse=True)
     ans = ""
-    while ind < len(clothing):
-        ans += color_clothing[ind] + " " + clothing[ind] + ", "
-        ind += 1
+    for key in sorted_keys_in_clothing_dict:
+        ans += key + " " + clothing_dict[key][1] + ", "
     print(ans[:-2])
